@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BAZA Projects</title>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+        }
+
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .project-card {
+            transition: transform 0.15s ease;
+        }
+
+        .project-card:active {
+            transform: scale(0.98);
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="projects-page" class="page active">
+            <div class="bg-white shadow-sm sticky top-0 z-10">
+                <div class="max-w-2xl mx-auto px-4 py-3">
+                    <h1 class="text-lg font-semibold text-gray-800">Проекты</h1>
+                </div>
+            </div>
+
+            <div class="bg-white border-b sticky top-12 z-10">
+                <div class="max-w-2xl mx-auto px-4 py-2">
+                    <div class="flex gap-1 bg-gray-100 rounded-lg p-1">
+                        <button
+                            v-for="city in cities"
+                            :key="city"
+                            @click="selectedCity = city"
+                            :class="[
+                                'flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                                selectedCity === city
+                                    ? 'bg-white text-gray-900 shadow-sm'
+                                    : 'text-gray-600 hover:text-gray-900'
+                            ]"
+                        >
+                            {{ city }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="max-w-2xl mx-auto px-4 py-4 pb-20">
+                <div v-if="loading" class="flex justify-center py-12">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+
+                <div v-else class="space-y-3">
+                    <div
+                        v-for="project in filteredProjects"
+                        :key="project.id"
+                        @click="openProjectDetail(project)"
+                        class="project-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer border border-gray-100"
+                    >
+                        <div class="flex">
+                            <div class="w-32 h-32 flex-shrink-0 bg-gray-200 overflow-hidden">
+                                <img
+                                    v-if="project.image_url"
+                                    :src="project.image_url"
+                                    :alt="project.name"
+                                    class="w-full h-full object-cover"
+                                    @error="handleImageError"
+                                >
+                                <div v-else class="w-full h-full gradient-bg flex items-center justify-center">
+                                    <span class="text-white text-3xl">ФОТО</span>
+                                </div>
+                            </div>
+
+                            <div class="flex-1 p-3">
+                                <div class="mb-1.5">
+                                    <span class="inline-block bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded">
+                                        Вознаграждение {{ project.reward_percent }}%
+                                    </span>
+                                </div>
+
+                                <h3 class="font-bold text-gray-900 mb-1 line-clamp-2">{{ project.name }}</h3>
+
+                                <p class="text-xs text-gray-500 mb-2">
+                                    {{ project.city }}{{ project.address ? ', ' + project.address : '' }} / {{ project.completion_date || 'Срок уточняется' }}
+                                </p>
+
+                                <div class="flex flex-wrap gap-1.5">
+                                    <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
+                                        Проект BAZA
+                                    </span>
+                                    <span class="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded">
+                                        Старт продаж
+                                    </span>
+                                    <span class="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
+                                        Сдача 1 очереди
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="project-detail-page" class="page">
+            <div class="bg-white shadow-sm sticky top-0 z-10">
+                <div class="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+                    <button @click="backToProjects" class="text-blue-600 font-medium">
+                        ← Назад
+                    </button>
+                    <h1 class="text-base font-semibold text-gray-800 flex-1">{{ currentProject?.name }}</h1>
+                </div>
+            </div>
+
+            <div v-if="currentProject" class="max-w-2xl mx-auto pb-20">
+                <div class="h-64 bg-gray-200 overflow-hidden">
+                    <img
+                        v-if="currentProject.image_url"
+                        :src="currentProject.image_url"
+                        :alt="currentProject.name"
+                        class="w-full h-full object-cover"
+                    >
+                    <div v-else class="w-full h-full gradient-bg flex items-center justify-center">
+                        <span class="text-white text-8xl">ФОТО</span>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4">
+                    <div class="mb-3">
+                        <span class="inline-block bg-red-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                            Вознаграждение {{ currentProject.reward_percent }}%
+                        </span>
+                    </div>
+
+                    <h2 class="text-xl font-bold text-gray-900 mb-2">{{ currentProject.name }}</h2>
+                    <p class="text-gray-600 mb-4">{{ currentProject.address }}</p>
+
+                    <div class="prose prose-sm mb-6">
+                        <p class="text-gray-700 leading-relaxed">
+                            {{ currentProject.description || 'Описание проекта скоро появится' }}
+                        </p>
+                    </div>
+
+                    <div v-if="currentProject.price_from" class="mb-6 p-4 bg-gray-50 rounded-xl">
+                        <p class="text-sm text-gray-600 mb-1">Стоимость от</p>
+                        <p class="text-2xl font-bold text-gray-900">
+                            {{ formatPrice(currentProject.price_from) }} ₽
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 mb-6">
+                        <span class="text-sm bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg">
+                            Проект BAZA
+                        </span>
+                        <span class="text-sm bg-green-50 text-green-700 px-3 py-1.5 rounded-lg">
+                            Сдача 1 очереди
+                        </span>
+                        <span class="text-sm bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg">
+                            Старт продаж
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <button @click="showCatalog" class="flex flex-col items-center justify-center p-4 bg-blue-50 hover:bg-blue-100 rounded-xl transition">
+                            <span class="text-sm font-semibold text-blue-900">Каталог квартир</span>
+                        </button>
+
+                        <button @click="showPaymentMethods" class="flex flex-col items-center justify-center p-4 bg-purple-50 hover:bg-purple-100 rounded-xl transition">
+                            <span class="text-sm font-semibold text-purple-900">Способы покупки</span>
+                        </button>
+
+                        <button @click="showMaterials" class="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 rounded-xl transition">
+                            <span class="text-sm font-semibold text-green-900">Материалы</span>
+                        </button>
+
+                        <button @click="showMedia" class="flex flex-col items-center justify-center p-4 bg-orange-50 hover:bg-orange-100 rounded-xl transition">
+                            <span class="text-sm font-semibold text-orange-900">Медиа</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    projects: [],
+                    loading: true,
+                    selectedCity: 'Все',
+                    cities: ['Все', 'Екатеринбург', 'Москва', 'Бали'],
+                    currentProject: null,
+                    currentPage: 'projects'
+                };
+            },
+
+            computed: {
+                filteredProjects() {
+                    if (this.selectedCity === 'Все') return this.projects;
+                    return this.projects.filter(p => p.city === this.selectedCity);
+                }
+            },
+
+            async mounted() {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
+                    window.Telegram.WebApp.expand();
+                    window.Telegram.WebApp.setHeaderColor('#ffffff');
+                }
+
+                await this.loadProjects();
+            },
+
+            methods: {
+                async loadProjects() {
+                    try {
+                        const response = await fetch('http://localhost:8000/projects/');
+                        if (response.ok) {
+                            this.projects = await response.json();
+                        }
+                    } catch (error) {
+                        console.error('Ошибка загрузки проектов:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                formatPrice(price) {
+                    return new Intl.NumberFormat('ru-RU').format(price);
+                },
+
+                handleImageError(event) {
+                    event.target.style.display = 'none';
+                },
+
+                openProjectDetail(project) {
+                    if (window.Telegram?.WebApp?.HapticFeedback) {
+                        window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                    }
+
+                    this.currentProject = project;
+                    this.currentPage = 'detail';
+
+                    document.getElementById('projects-page').classList.remove('active');
+                    document.getElementById('project-detail-page').classList.add('active');
+
+                    window.scrollTo(0, 0);
+                },
+
+                backToProjects() {
+                    this.currentPage = 'projects';
+
+                    document.getElementById('project-detail-page').classList.remove('active');
+                    document.getElementById('projects-page').classList.add('active');
+                },
+
+                showCatalog() {
+                    window.Telegram?.WebApp?.showAlert('Каталог квартир скоро будет доступен');
+                },
+
+                showPaymentMethods() {
+                    window.Telegram?.WebApp?.showAlert('Способы покупки: ипотека, рассрочка, 100% оплата');
+                },
+
+                showMaterials() {
+                    window.Telegram?.WebApp?.showAlert('Презентации и планировки скоро будут доступны');
+                },
+
+                showMedia() {
+                    window.Telegram?.WebApp?.showAlert('Фото и видео скоро будут доступны');
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
